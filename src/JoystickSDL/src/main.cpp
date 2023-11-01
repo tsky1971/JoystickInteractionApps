@@ -70,6 +70,15 @@ ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "../../Common/oscpkt/oscpkt.hh"
+#include "../../Common/oscpkt/udp.hh"
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 static char* HIDAPI_ConvertString(const wchar_t* wide_string)
 {
 	char* string = NULL;
@@ -96,28 +105,53 @@ static char* HIDAPI_ConvertString(const wchar_t* wide_string)
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-enum class EJoystickInputType : Uint8
+enum EJoystickInputType : Uint8
 {
-	INPUTTYPE_UNKNOWN,
+	INPUTTYPE_UNKNOW = 0,
 	INPUTTYPE_JOYSTICK,
 	INPUTTYPE_GAMECONTROLLER,
 };
 
-enum class EJoystickPOVDirection : Uint8
+/*
+SDL_HAT_LEFTUP
+SDL_HAT_UP
+SDL_HAT_RIGHTUP
+SDL_HAT_LEFT
+SDL_HAT_CENTERED
+SDL_HAT_RIGHT
+SDL_HAT_LEFTDOWN
+SDL_HAT_DOWN
+SDL_HAT_RIGHTDOWN
+*/
+enum EJoystickPOVDirection : Uint8
 {
-	DIRECTION_NONE,
-	DIRECTION_UP,
-	DIRECTION_UP_RIGHT,
-	DIRECTION_RIGHT,
-	DIRECTION_DOWN_RIGHT,
-	DIRECTION_DOWN,
-	DIRECTION_DOWN_LEFT,
-	DIRECTION_LEFT,
-	DIRECTION_UP_LEFT,
+	HAT_CENTERED = 0x00,
+	
+	HAT_UP = 0x01,	
+	HAT_RIGHT = 0x02,	
+	HAT_DOWN = 0x04,	
+	HAT_LEFT = 0x08,
+
+	HAT_RIGHTUP = HAT_RIGHT | HAT_UP,
+	HAT_RIGHTDOWN = HAT_RIGHT | HAT_DOWN,
+	HAT_LEFTUP = HAT_LEFT | HAT_UP,
+	HAT_LEFTDOWN = HAT_LEFT | HAT_DOWN
+
+	//DIRECTION_NONE = 0,
+	//DIRECTION_UP,
+	//DIRECTION_UP_RIGHT,
+	//DIRECTION_RIGHT,
+	//DIRECTION_DOWN_RIGHT,
+	//DIRECTION_DOWN,
+	//DIRECTION_DOWN_LEFT,
+	//DIRECTION_LEFT,
+	//DIRECTION_UP_LEFT,
 };
 
 struct SJoystickState
 {	
+	Uint32 type;      
+	Uint64 timestamp;   /**< In nanoseconds, populated using SDL_GetTicksNS() */
 	Sint16 Axes[16];
 	Uint8 Buttons[64];
 	EJoystickPOVDirection Hats[8];
@@ -140,6 +174,97 @@ struct SInputDevice_SDL
 };
 
 std::map<Uint32, SInputDevice_SDL> InputDeviceMap;
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void ScanJoystickDevices()
+{
+
+	if (InputDeviceMap.size() > 0) {
+		InputDeviceMap.clear();
+	}
+
+	g_pJoystickIDArray = SDL_GetJoysticks(&g_NumJoysticks);
+
+	for (int deviceIndex = 0; deviceIndex < g_NumJoysticks; deviceIndex++) {
+
+		SDL_JoystickID joystickInstanceID = g_pJoystickIDArray[deviceIndex];
+		SDL_Log("Joystick deviceIndex=%d <-> JoystickId=%d", deviceIndex, joystickInstanceID);
+
+		std::cout << "JoystickInstanceName: " << SDL_GetJoystickInstanceName(joystickInstanceID) << std::endl;
+
+		if (SDL_IsGamepad(joystickInstanceID)) {
+			std::cout << "IsGamepad " << g_pszGUID << std::endl;
+		}
+		else
+			if (SDL_IsJoystickVirtual(joystickInstanceID)) {
+				std::cout << "SDL_IsJoystickVirtual " << g_pszGUID << std::endl;
+			}
+			else {
+				std::cout << "unknown " << g_pszGUID << std::endl;
+			}
+
+		SDL_Joystick* pJoystickDevice = SDL_OpenJoystick(joystickInstanceID);
+		if (pJoystickDevice != nullptr) {
+
+			SDL_JoystickGUID guid = SDL_GetJoystickGUID(pJoystickDevice);
+			SDL_GetJoystickGUIDString(guid, g_pszGUID, 33);
+
+			std::cout << "Joystick: " << SDL_GetJoystickName(pJoystickDevice) << " GUID=" << g_pszGUID << std::endl;
+			std::cout << "Joystick Name " << SDL_GetJoystickInstanceName(joystickInstanceID) << std::endl;
+			std::cout << "--- Number of Axis " << SDL_GetNumJoystickAxes(pJoystickDevice) << std::endl;
+			std::cout << "--- Number of Buttons " << SDL_GetNumJoystickButtons(pJoystickDevice) << std::endl;
+			std::cout << "--- Number of Hats " << SDL_GetNumJoystickHats(pJoystickDevice) << std::endl;
+
+			SInputDevice_SDL& device = InputDeviceMap[joystickInstanceID];
+			device.sdl_InstanceID = joystickInstanceID;
+			device.sdl_pJoystickDevice = pJoystickDevice;
+			device.DeviceName = SDL_GetJoystickName(pJoystickDevice);
+			device.Axes = SDL_GetNumJoystickAxes(pJoystickDevice);
+			device.Buttons = SDL_GetNumJoystickButtons(pJoystickDevice);
+			device.Hats = SDL_GetNumJoystickHats(pJoystickDevice);
+		}
+
+		//SDL_Gamepad* pGameDevice = SDL_OpenGamepad(deviceIndex);
+		//if (pGameDevice != nullptr) {
+		//	//SDL_SensorType sensorType;
+
+		//	if (SDL_GamepadHasSensor(pGameDevice, SDL_SENSOR_INVALID)) {
+		//		std::cout << "SDL_SENSOR_INVALID" << std::endl;
+		//	}
+		//	if (SDL_GamepadHasSensor(pGameDevice, SDL_SENSOR_UNKNOWN)) {
+		//		std::cout << "SDL_SENSOR_UNKNOWN" << std::endl;
+		//	}
+		//	if (SDL_GamepadHasSensor(pGameDevice, SDL_SENSOR_ACCEL)) {
+		//		std::cout << "Accelerometer" << std::endl;
+		//	}
+		//	if (SDL_GamepadHasSensor(pGameDevice, SDL_SENSOR_GYRO)) {
+		//		std::cout << "Gyroscope" << std::endl;
+		//	}
+		//	if (SDL_GamepadHasSensor(pGameDevice, SDL_SENSOR_ACCEL_L)) {
+		//		std::cout << "Accelerometer for left Joy-Con controller and Wii nunchuk " << std::endl;
+		//	}
+		//	if (SDL_GamepadHasSensor(pGameDevice, SDL_SENSOR_GYRO_L)) {
+		//		std::cout << "Gyroscope for left Joy-Con controller" << std::endl;
+		//	}
+		//	if (SDL_GamepadHasSensor(pGameDevice, SDL_SENSOR_ACCEL_R)) {
+		//		std::cout << " Accelerometer for right Joy-Con controller" << std::endl;
+		//	}
+		//	if (SDL_GamepadHasSensor(pGameDevice, SDL_SENSOR_GYRO_R)) {
+		//		std::cout << "SDL_SENSOR_UNKNOWN" << std::endl;
+		//	}
+		//	
+		//}
+		std::cout << "--- deviceIndex " << deviceIndex << " END ---" << std::endl << std::endl;
+	}
+	SDL_free(g_pJoystickIDArray);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -262,79 +387,7 @@ int Init()
 
 	result = SDL_WasInit(SDL_INIT_JOYSTICK);
 
-	g_pJoystickIDArray = SDL_GetJoysticks(&g_NumJoysticks);
-	
-	for (int deviceIndex = 0; deviceIndex < g_NumJoysticks; deviceIndex++) {
-
-		SDL_JoystickID joystickInstanceID = g_pJoystickIDArray[deviceIndex];
-		SDL_Log("Joystick deviceIndex=%d <-> JoystickId=%d", deviceIndex, joystickInstanceID);	
-
-		std::cout << "JoystickInstanceName: " << SDL_GetJoystickInstanceName(joystickInstanceID) << std::endl;
-
-		if (SDL_IsGamepad(joystickInstanceID)) {
-			std::cout << "IsGamepad " << g_pszGUID << std::endl;
-		}
-		else
-			if (SDL_IsJoystickVirtual(joystickInstanceID)) {
-				std::cout << "SDL_IsJoystickVirtual " << g_pszGUID << std::endl;
-			}
-			else {
-				std::cout << "unknown " << g_pszGUID << std::endl;
-			}
-
-		SDL_Joystick* pJoystickDevice = SDL_OpenJoystick(joystickInstanceID);		
-		if (pJoystickDevice != nullptr) {
-					
-			SDL_JoystickGUID guid = SDL_GetJoystickGUID(pJoystickDevice);			
-			SDL_GetJoystickGUIDString(guid, g_pszGUID, 33);
-		
-			std::cout << "Joystick: " << SDL_GetJoystickName(pJoystickDevice) << " GUID=" << g_pszGUID << std::endl;
-			std::cout << "Joystick Name " << SDL_GetJoystickInstanceName(joystickInstanceID) << std::endl;
-			std::cout << "--- Number of Axis " << SDL_GetNumJoystickAxes(pJoystickDevice) << std::endl;			
-			std::cout << "--- Number of Buttons " << SDL_GetNumJoystickButtons(pJoystickDevice) << std::endl;
-			std::cout << "--- Number of Hats " << SDL_GetNumJoystickHats(pJoystickDevice) << std::endl;
-
-			SInputDevice_SDL &device = InputDeviceMap[joystickInstanceID];
-			device.sdl_InstanceID = joystickInstanceID;
-			device.sdl_pJoystickDevice = pJoystickDevice;
-			device.DeviceName = SDL_GetJoystickName(pJoystickDevice);
-			device.Axes = SDL_GetNumJoystickAxes(pJoystickDevice);			
-			device.Buttons = SDL_GetNumJoystickButtons(pJoystickDevice);
-			device.Hats = SDL_GetNumJoystickHats(pJoystickDevice);
-		}
-
-		//SDL_Gamepad* pGameDevice = SDL_OpenGamepad(deviceIndex);
-		//if (pGameDevice != nullptr) {
-		//	//SDL_SensorType sensorType;
-
-		//	if (SDL_GamepadHasSensor(pGameDevice, SDL_SENSOR_INVALID)) {
-		//		std::cout << "SDL_SENSOR_INVALID" << std::endl;
-		//	}
-		//	if (SDL_GamepadHasSensor(pGameDevice, SDL_SENSOR_UNKNOWN)) {
-		//		std::cout << "SDL_SENSOR_UNKNOWN" << std::endl;
-		//	}
-		//	if (SDL_GamepadHasSensor(pGameDevice, SDL_SENSOR_ACCEL)) {
-		//		std::cout << "Accelerometer" << std::endl;
-		//	}
-		//	if (SDL_GamepadHasSensor(pGameDevice, SDL_SENSOR_GYRO)) {
-		//		std::cout << "Gyroscope" << std::endl;
-		//	}
-		//	if (SDL_GamepadHasSensor(pGameDevice, SDL_SENSOR_ACCEL_L)) {
-		//		std::cout << "Accelerometer for left Joy-Con controller and Wii nunchuk " << std::endl;
-		//	}
-		//	if (SDL_GamepadHasSensor(pGameDevice, SDL_SENSOR_GYRO_L)) {
-		//		std::cout << "Gyroscope for left Joy-Con controller" << std::endl;
-		//	}
-		//	if (SDL_GamepadHasSensor(pGameDevice, SDL_SENSOR_ACCEL_R)) {
-		//		std::cout << " Accelerometer for right Joy-Con controller" << std::endl;
-		//	}
-		//	if (SDL_GamepadHasSensor(pGameDevice, SDL_SENSOR_GYRO_R)) {
-		//		std::cout << "SDL_SENSOR_UNKNOWN" << std::endl;
-		//	}
-		//	
-		//}
-		std::cout << "--- deviceIndex " << deviceIndex << " END ---" << std::endl << std::endl;
-	}
+	ScanJoystickDevices();
 
 	return 0;
 }
@@ -342,8 +395,6 @@ int Init()
 void Done()
 {
 	// Cleanup
-
-	SDL_free(g_pJoystickIDArray);
 
 	ImGui_ImplSDLRenderer3_Shutdown();
 	ImGui_ImplSDL3_Shutdown();
@@ -396,19 +447,19 @@ void AppLoop()
 				switch (event.type)
 				{
 				case SDL_EVENT_JOYSTICK_ADDED:
-					SDL_Log("Event ADD Joystick Device=%d", event.jdevice.which);
-					break;
-				case SDL_EVENT_GAMEPAD_ADDED:
 				{
-					SDL_Log("Event ADD Joystick/GameController Device=%d will be added. TESTING PHASE", event.gdevice.which);
+					SDL_Log("Event ADD Joystick Device=%d. TESTING PHASE", event.jdevice.which);
+					
+					ScanJoystickDevices();
 
-					break;
-				}
+				} break;				
 				case SDL_EVENT_JOYSTICK_REMOVED:
 				{
-					SDL_Log("Event REMOVE Joystick Device=%d will be removed", event.jdevice.which);
-					break;
-				}
+					SDL_Log("Event REMOVE Joystick Device=%d will be removed. TESTING PHASE", event.jdevice.which);
+
+					ScanJoystickDevices();
+					
+				} break;
 				case SDL_EVENT_JOYSTICK_BUTTON_DOWN:
 				case SDL_EVENT_JOYSTICK_BUTTON_UP:
                 {
@@ -418,10 +469,12 @@ void AppLoop()
                         SInputDevice_SDL* inputDevice = &(search->second);
 						Uint8 value = event.jbutton.state;
 						inputDevice->CurrentState.Buttons[event.jbutton.button] = value;
+						inputDevice->CurrentState.type = event.type;
+						inputDevice->CurrentState.timestamp = SDL_GetTicksNS();						
 					}
 
-					break;
-                }
+					
+                } break;
 				case SDL_EVENT_JOYSTICK_AXIS_MOTION:
                   {
 					//SDL_Log("Event JoystickAxis Device=%d Axis=%d Value=%d", event.jdevice.which, event.jaxis.axis, event.jaxis.value / (event.jaxis.value < 0 ? 32768.0f : 32767.0f));
@@ -431,14 +484,34 @@ void AppLoop()
 						SInputDevice_SDL *inputDevice = &(search->second);
 						Sint16 value = event.jaxis.value;
 						inputDevice->CurrentState.Axes[event.jaxis.axis] = value;
+						inputDevice->CurrentState.type = event.type;
+						inputDevice->CurrentState.timestamp = SDL_GetTicksNS();
 					}
-					break;
-                }
+					
+                } break;
 				case SDL_EVENT_JOYSTICK_HAT_MOTION:
 					//SDL_Log("Event JoystickHat Device=%d Hat=%d Value=%d", event.jdevice.which, event.jhat.hat, event.jhat.value);
+
+					auto search = InputDeviceMap.find(event.jdevice.which);
+					if (search != InputDeviceMap.end()) {
+						SInputDevice_SDL* inputDevice = &(search->second);
+
+						EJoystickPOVDirection value = (EJoystickPOVDirection) event.jhat.value;
+						inputDevice->CurrentState.Hats[event.jhat.hat] = value;
+						inputDevice->CurrentState.type = event.type;
+						inputDevice->CurrentState.timestamp = SDL_GetTicksNS();
+					}
+
 					break;
 				}
 			}
+
+
+			oscpkt::PacketWriter pkt;
+			oscpkt::Message msg;
+			
+			pkt.startBundle();
+			
 
 			std::map<Uint32, SInputDevice_SDL>::iterator deviceIter = InputDeviceMap.begin();
 			for (auto& [_instanceId, _inputDevice] : InputDeviceMap) {
@@ -456,6 +529,14 @@ void AppLoop()
 				ImGui::Text("Number of Buttons %i", device.Buttons);
 				ImGui::Text("Number of Hats %i", device.Hats);
 				
+				pkt.addMessage(msg.init("/InputDevice")
+					.pushStr(device.DeviceName)
+					.pushInt64(SDL_GetTicksNS())
+					.pushStr("Axes").pushInt32(device.Axes)
+					.pushStr("Buttons").pushInt32(device.Buttons)
+					.pushStr("Hats").pushInt32(device.Hats)
+					);
+				
 				char axeName[16];
 				int ivalue = 0;
 				Uint8 bvalue = false;
@@ -465,8 +546,12 @@ void AppLoop()
 
 					//SDL_Log("JoystickAxis Device=%d Axis=%d Value=%i", device.sdl_InstanceID, idx, ivalue);
 
-                    sprintf(axeName, "Axis %d", idx);
+                    sprintf_s(axeName, sizeof(axeName), "Axis %02d", idx);
 					ImGui::SliderInt(axeName, &ivalue, -32768, 32768);
+
+					pkt.addMessage(msg.init("/Axis")
+						.pushInt32(idx).pushInt32(ivalue)
+					);
 				}
 
 				int x = 1;
@@ -475,7 +560,7 @@ void AppLoop()
 
 					//SDL_Log("JoystickAxis Device=%d Button=%d Value=%i", device.sdl_InstanceID, idx, bvalue);
 
-					sprintf(axeName, "B %d", idx);
+					sprintf_s(axeName, sizeof(axeName), "B %02d", idx);
 					if (bvalue == 1) {		
 						ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.2f, 0.3f, 0.4f, 1.0f });
 						if (ImGui::Button(axeName, ImVec2(50, 20))) {
@@ -504,47 +589,95 @@ void AppLoop()
 						}
 					}
 					x++;
+					strcpy(axeName, "");
+
+					pkt.addMessage(msg.init("/Button")
+						.pushInt32(idx).pushInt32(bvalue)
+					);
 				}
-				
+				ImGui::NewLine();
 
-				/*SDL_JoystickID joystickInstanceID = g_pJoystickIDArray[deviceIndex];
+				for (int idx = 0; idx < device.Hats; idx++) {
+					EJoystickPOVDirection value = device.CurrentState.Hats[idx];
 
-				SDL_Joystick* pJoystickDevice = SDL_OpenJoystick(joystickInstanceID);
-				if (pJoystickDevice != nullptr) {
-					std::string deviceName = SDL_GetJoystickName(pJoystickDevice);
+					//SDL_Log("JoystickAxis Device=%d Hats=%d Value=%i", device.sdl_InstanceID, idx, bvalue);
+										
+					switch (value)
+					{					
+					case HAT_CENTERED:
+						SDL_Log("JoystickAxis Device=%d Hats=%d HAT_CENTERED", device.sdl_InstanceID, idx);
+						sprintf(axeName, "H %d HAT_CENTERED", idx);
+						break;
+					case HAT_UP:
+						SDL_Log("JoystickAxis Device=%d Hats=%d HAT_UP", device.sdl_InstanceID, idx);
+						sprintf(axeName, "H %d HAT_UP", idx);
+						break;
+					case HAT_RIGHTUP:
+						SDL_Log("JoystickAxis Device=%d Hats=%d HAT_RIGHTUP", device.sdl_InstanceID, idx); 
+						sprintf(axeName, "H %d HAT_RIGHTUP", idx);
+						break;
+					case HAT_RIGHT:
+						SDL_Log("JoystickAxis Device=%d Hats=%d HAT_RIGHT", device.sdl_InstanceID, idx);
+						sprintf(axeName, "H %d HAT_RIGHT", idx);
+						break;
+					case HAT_RIGHTDOWN:
+						SDL_Log("JoystickAxis Device=%d Hats=%d HAT_RIGHTDOWN", device.sdl_InstanceID, idx);
+						sprintf(axeName, "H %d HAT_RIGHTDOWN", idx);
+						break;
+					case HAT_DOWN:
+						SDL_Log("JoystickAxis Device=%d Hats=%d HAT_DOWN", device.sdl_InstanceID, idx);
+						sprintf(axeName, "H %d HAT_DOWN", idx);
+						break;
+					case HAT_LEFTDOWN:
+						SDL_Log("JoystickAxis Device=%d Hats=%d HAT_LEFTDOWN", device.sdl_InstanceID, idx);
+						sprintf(axeName, "H %d HAT_LEFTDOWN", idx);
+						break;
+					case HAT_LEFT:
+						SDL_Log("JoystickAxis Device=%d Hats=%d HAT_LEFT", device.sdl_InstanceID, idx);
+						sprintf(axeName, "H %d HAT_LEFT", idx);
+						break;
+					case HAT_LEFTUP:
+						SDL_Log("JoystickAxis Device=%d Hats=%d HAT_LEFTUP", device.sdl_InstanceID, idx);
+						sprintf(axeName, "H %d HAT_LEFTUP", idx);
+						break;		
+					default:
+						SDL_Log("JoystickAxis Device=%d Hats=%d ???", device.sdl_InstanceID, idx);
+						sprintf(axeName, "H %d ???", idx);
+						break;
+					}
+					
+					if (ImGui::Button(axeName, ImVec2(300, 20))) {
 
-					ImGui::Begin(deviceName.c_str(), &show_another_window);
-					ImGui::Text("%s", SDL_GetJoystickName(pJoystickDevice));
-					ImGui::Text("DeviceIndex %d", deviceIndex);
-					ImGui::Text("InstanceID %d", joystickInstanceID);
-
-					SDL_JoystickGUID guid = SDL_GetJoystickGUID(pJoystickDevice);
-					SDL_GetJoystickGUIDString(guid, g_pszGUID, 33);
-
-					int NumJoystickAxes = SDL_GetNumJoystickAxes(pJoystickDevice);
-					int NumJoystickButtons = SDL_GetNumJoystickButtons(pJoystickDevice);
-					int NumJoystickHats = SDL_GetNumJoystickHats(pJoystickDevice);
-
-					ImGui::Text("GUID %s", g_pszGUID);
-					ImGui::Text("Number of Axis %i", NumJoystickAxes);
-					ImGui::Text("Number of Buttons %i", NumJoystickButtons);
-					ImGui::Text("Number of Hats %i", NumJoystickHats);
-
-					for (int na = 0; na < NumJoystickButtons; ++na) {
 					}
 
-					char axeName[16];
-
-					for (int na = 0; na < NumJoystickAxes; ++na) {
-						float axis = event.jaxis.axis;
-						float value = event.jaxis.value;
-						sprintf(axeName, "Axis %f", axis);
-						ImGui::SliderFloat(axeName, &value, -32768, 32768);
-					}			
+					pkt.addMessage(msg.init("/Hat")
+						.pushInt32(idx).pushInt32(bvalue)
+					);
+					
+					ImGui::NewLine();
+					strcpy(axeName, "");
 				}
-					*/
+
+				pkt.addMessage(msg.init("/Timestamp")
+					.pushInt64(SDL_GetTicksNS())
+				);
+
+				pkt.endBundle();
+
+				if (pkt.isOk()) {
+					oscpkt::UdpSocket sock;
+					sock.connectTo("localhost", 8000);
+					if (!sock.isOk()) {
+						SDL_Log("Error connection to port %d - ERROR: %s", 8000, sock.errorMessage());
+					} else {
+						sock.sendPacket(pkt.packetData(), pkt.packetSize());
+						sock.close();
+					}
+					
+				}
 
 				ImGui::End();
+
 				
 			} // for
 	
