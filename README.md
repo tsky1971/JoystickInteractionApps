@@ -14,10 +14,9 @@ I created this because my JoystickPlugin for UE did not recognise the Saitek Rud
 
 
 # Roadmap
-X add OSC to send joystick updates
-X hotplug
+- add OSC to send joystick updates [wip]
+- hotplug [partial]
 - add MQTT or ZMQ
 - connect with an UE-plugin (maybe JoystickDeviceConnector?!) to get device data in UE via OSC or MQTT or ZMQ from JoystickSDL
-- run JoystickSDL on RPI
-
-- 
+- run JoystickSDL on RPI [wip]
+- ...
