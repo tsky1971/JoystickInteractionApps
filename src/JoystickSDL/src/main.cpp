@@ -26,7 +26,7 @@ using namespace std::literals;
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// SDL2 Headers
+// SDL Headers
 #if defined(_WINDOWS)
 	#define SDL_MAIN_HANDLED	
 	#include <SDL3/SDL.h>
@@ -55,9 +55,9 @@ char g_pszGUID[33];
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "imgui/imgui.h"
-#include "imgui/imgui_impl_sdl3.h"
-#include "imgui/imgui_impl_sdlrenderer3.h"
+#include "../../Common/imgui/imgui.h"
+#include "../../Common/imgui/imgui_impl_sdl3.h"
+#include "../../Common/imgui/imgui_impl_sdlrenderer3.h"
 
 ImGuiIO io;
 bool show_demo_window = false;
@@ -411,25 +411,29 @@ void AppLoop()
 				}
 				case SDL_EVENT_JOYSTICK_BUTTON_DOWN:
 				case SDL_EVENT_JOYSTICK_BUTTON_UP:
+                {
 					SDL_Log("Event JoystickButton Device=%d Button=%d State=%d", event.jdevice.which, event.jbutton.button, event.jbutton.state);
-					
-					if (auto &search = InputDeviceMap.find(event.jdevice.which); search != InputDeviceMap.end()) {
-						SInputDevice_SDL* inputDevice = &(search->second);
+                    auto search = InputDeviceMap.find(event.jdevice.which);
+                    if (search != InputDeviceMap.end()) {
+                        SInputDevice_SDL* inputDevice = &(search->second);
 						Uint8 value = event.jbutton.state;
 						inputDevice->CurrentState.Buttons[event.jbutton.button] = value;
 					}
 
 					break;
+                }
 				case SDL_EVENT_JOYSTICK_AXIS_MOTION:
+                  {
 					//SDL_Log("Event JoystickAxis Device=%d Axis=%d Value=%d", event.jdevice.which, event.jaxis.axis, event.jaxis.value / (event.jaxis.value < 0 ? 32768.0f : 32767.0f));
 					//SDL_Log("Event JoystickAxis Device=%d Axis=%d Value=%d", event.jdevice.which, event.jaxis.axis, event.jaxis.value);						
-					
-					if (auto& search = InputDeviceMap.find(event.jdevice.which); search != InputDeviceMap.end()) {
+                    auto search = InputDeviceMap.find(event.jdevice.which);
+                    if (search != InputDeviceMap.end()) {
 						SInputDevice_SDL *inputDevice = &(search->second);
 						Sint16 value = event.jaxis.value;
 						inputDevice->CurrentState.Axes[event.jaxis.axis] = value;
 					}
 					break;
+                }
 				case SDL_EVENT_JOYSTICK_HAT_MOTION:
 					//SDL_Log("Event JoystickHat Device=%d Hat=%d Value=%d", event.jdevice.which, event.jhat.hat, event.jhat.value);
 					break;
@@ -461,7 +465,7 @@ void AppLoop()
 
 					//SDL_Log("JoystickAxis Device=%d Axis=%d Value=%i", device.sdl_InstanceID, idx, ivalue);
 
-					sprintf(axeName, "Axis %f", idx);
+                    sprintf(axeName, "Axis %d", idx);
 					ImGui::SliderInt(axeName, &ivalue, -32768, 32768);
 				}
 

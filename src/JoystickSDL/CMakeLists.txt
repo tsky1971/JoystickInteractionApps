@@ -68,14 +68,12 @@ set(OPEN_GL_FILES
 #find_package(imgui CONFIG REQUIRED)
 #find_package(assimp CONFIG REQUIRED)
 find_package(ZeroMQ CONFIG REQUIRED)
-find_package(czmq CONFIG REQUIRED)
+#find_package(czmq CONFIG REQUIRED)
 #find_package(cppzmq)
 
 #find_package(SDL2 CONFIG REQUIRED)
 find_package(SDL3 REQUIRED CONFIG REQUIRED COMPONENTS SDL3)
 #find_package(SDL2_net CONFIG REQUIRED)
-
-include_directories(${SDL2_INCLUDE_DIRS})
 
 add_definitions(-DGLM_ENABLE_EXPERIMENTAL)
 
@@ -85,7 +83,7 @@ add_definitions(-DGLM_ENABLE_EXPERIMENTAL)
 
 include_directories("${CMAKE_SOURCE_DIR}../../../include")
 
-include_directories("${CMAKE_SOURCE_DIR}../../Common")
+include_directories("${CMAKE_SOURCE_DIR}../Common")
 
 set(HEADER_FILES 
 	../Common/UDPsocket.h
@@ -139,7 +137,7 @@ target_link_libraries(
 	#PRIVATE glad::glad
 	#PRIVATE GLEW::GLEW
 	#PRIVATE GLUT::GLUT	
-    PRIVATE czmq czmq-static
+    #PRIVATE czmq czmq-static
 	PRIVATE libzmq libzmq-static
 	#${WIN32_OPEN_GL_FILES}
 #	cppzmq
@@ -148,12 +146,9 @@ target_link_libraries(
 else()
 
 target_link_libraries(
-	${PROJECT_NAME}
-        PRIVATE SDL2
-        PRIVATE GL
-	PRIVATE GLUT::GLUT
-	PRIVATE pthread
-        PRIVATE libzmq libzmq-static
+	${PROJECT_NAME}		
+	PRIVATE SDL3::SDL3
+    PRIVATE libzmq libzmq-static
 	)
 	
 endif()
@@ -181,67 +176,70 @@ install(
 #
 #######################################
 
-function(my_install_dll)
-	# Do something.
-	message("Copy DLL...")
+if(MSVC)
+    function(my_install_dll)
+            # Do something.
+            message("Copy DLL...")
 
-	add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy_if_different
-			"${CMAKE_TOOLCHAIN_FILE}/../../../installed/x64-windows/bin/glew32.dll"
-			${CMAKE_BINARY_DIR})
-			
-	message("Copy DLL END")
-endfunction()
+            add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                            "${CMAKE_TOOLCHAIN_FILE}/../../../installed/x64-windows/bin/glew32.dll"
+                            ${CMAKE_BINARY_DIR})
 
-function(my_install_dll2)  
-  message("This is my function.")
+            message("Copy DLL END")
+    endfunction()
 
-add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD						# Adds a post-build event to MyTest
-	COMMAND ${CMAKE_COMMAND} -E copy_if_different							# which executes "cmake - E copy_if_different..."
-		"../../../vcpkg/installed/x64-windows/bin/glfw3.dll"				# <--this is in-file
-		"../../../bin")														# <--this is out-file path
+    function(my_install_dll2)
+      message("This is my function.")
 
-add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD						# Adds a post-build event to MyTest
-	COMMAND ${CMAKE_COMMAND} -E copy_if_different							# which executes "cmake - E copy_if_different..."
-		"../../../vcpkg/installed/x64-windows/bin/assimp-vc142-mt.dll"		# <--this is in-file
-		"../../../bin")														# <--this is out-file path
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD						# Adds a post-build event to MyTest
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different							# which executes "cmake - E copy_if_different..."
+                    "../../../vcpkg/installed/x64-windows/bin/glfw3.dll"				# <--this is in-file
+                    "../../../bin")														# <--this is out-file path
 
-add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD						# Adds a post-build event to MyTest
-	COMMAND ${CMAKE_COMMAND} -E copy_if_different							# which executes "cmake - E copy_if_different..."
-		"../../../vcpkg/installed/x64-windows/bin/zlib1.dll"				# <--this is in-file
-		"../../../bin")														# <--this is out-file path
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD						# Adds a post-build event to MyTest
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different							# which executes "cmake - E copy_if_different..."
+                    "../../../vcpkg/installed/x64-windows/bin/assimp-vc142-mt.dll"		# <--this is in-file
+                    "../../../bin")														# <--this is out-file path
 
-add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD						# Adds a post-build event to MyTest
-	COMMAND ${CMAKE_COMMAND} -E copy_if_different							# which executes "cmake - E copy_if_different..."
-		"../../../vcpkg/installed/x64-windows/bin/jpeg62.dll"				# <--this is in-file
-		"../../../bin")														# <--this is out-file path
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD						# Adds a post-build event to MyTest
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different							# which executes "cmake - E copy_if_different..."
+                    "../../../vcpkg/installed/x64-windows/bin/zlib1.dll"				# <--this is in-file
+                    "../../../bin")														# <--this is out-file path
 
-add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD						# Adds a post-build event to MyTest
-	COMMAND ${CMAKE_COMMAND} -E copy_if_different							# which executes "cmake - E copy_if_different..."
-		"../../../vcpkg/installed/x64-windows/bin/libpng16.dll"				# <--this is in-file
-		"../../../bin")														# <--this is out-file path
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD						# Adds a post-build event to MyTest
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different							# which executes "cmake - E copy_if_different..."
+                    "../../../vcpkg/installed/x64-windows/bin/jpeg62.dll"				# <--this is in-file
+                    "../../../bin")														# <--this is out-file path
+
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD						# Adds a post-build event to MyTest
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different							# which executes "cmake - E copy_if_different..."
+                    "../../../vcpkg/installed/x64-windows/bin/libpng16.dll"				# <--this is in-file
+                    "../../../bin")														# <--this is out-file path
 
 
-add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD						# Adds a post-build event to MyTest
-	COMMAND ${CMAKE_COMMAND} -E copy_if_different							# which executes "cmake - E copy_if_different..."
-		"../../../vcpkg/installed/x64-windows/bin/bz2.dll"					# <--this is in-file
-		"../../../bin")														# <--this is out-file path
-		
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD						# Adds a post-build event to MyTest
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different							# which executes "cmake - E copy_if_different..."
+                    "../../../vcpkg/installed/x64-windows/bin/bz2.dll"					# <--this is in-file
+                    "../../../bin")														# <--this is out-file path
 
-add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-	COMMAND ${CMAKE_COMMAND} -E copy_if_different
-		"../../../vcpkg/installed/x64-windows/bin/SDL2*.dll"
-		"../../../bin")
 
-endfunction()
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "../../../vcpkg/installed/x64-windows/bin/SDL2*.dll"
+                    "../../../bin")
 
-# Call the function.
-my_install_dll()
+    endfunction()
 
-## set working directory to bin directory
-set_property(TARGET ${PROJECT_NAME} PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "../../../bin")
+    # Call the function.
+    my_install_dll()
 
-## set the startup project to the current project
-set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME})
+    ## set working directory to bin directory
+    set_property(TARGET ${PROJECT_NAME} PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "../../../bin")
+
+    ## set the startup project to the current project
+    set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME})
+
+endif()
 
 install(TARGETS ${PROJECT_NAME} DESTINATION bin)
